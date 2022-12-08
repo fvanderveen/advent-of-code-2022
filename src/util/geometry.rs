@@ -373,17 +373,21 @@ pub struct Grid<T> where T: Clone + Default {
 }
 
 #[repr(u8)]
-#[derive(Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Directions {
-    Horizontal = 1,
-    Vertical = 2,
-    Diagonal = 4,
-    NonDiagonal = 3,
-    All = 7,
+    Top = 1,
+    Right = 2,
+    Bottom = 4,
+    Left = 8,
+    Diagonal = 16,
+    Horizontal = Directions::Left as u8 | Directions::Right as u8,
+    Vertical = Directions::Top as u8 | Directions::Bottom as u8,
+    NonDiagonal = Directions::Horizontal as u8 | Directions::Vertical as u8,
+    All = Directions::NonDiagonal as u8 | Directions::Diagonal as u8,
 }
 
 impl Directions {
-    fn has(&self, value: Directions) -> bool {
+    pub fn has(&self, value: Directions) -> bool {
         (self.clone() as u8 & value as u8) != 0
     }
 }
@@ -423,25 +427,46 @@ impl<T> Grid<T> where T: Clone + Default {
         let x = p.x;
         let y = p.y;
 
-        let include_vertical = directions.has(Directions::Vertical);
-        let include_horizontal = directions.has(Directions::Horizontal);
         let include_diagonal = directions.has(Directions::Diagonal);
 
-        let include_top = y > self.bounds.top;
-        let include_bottom = y < self.bounds.bottom() - 1;
-        let include_left = x > self.bounds.left;
-        let include_right = x < self.bounds.right() - 1;
+        let include_top = y > self.bounds.top && directions.has(Directions::Top);
+        let include_bottom = y < self.bounds.bottom() - 1 && directions.has(Directions::Bottom);
+        let include_left = x > self.bounds.left && directions.has(Directions::Left);
+        let include_right = x < self.bounds.right() - 1 && directions.has(Directions::Right);
 
-        if include_top && include_horizontal { points.push((x, y - 1).into()) } // top
+        if include_top { points.push((x, y - 1).into()) } // top
         if include_top && include_right && include_diagonal { points.push((x + 1, y - 1).into()) } // top-right
-        if include_right && include_horizontal { points.push((x + 1, y).into()) } // right
+        if include_right { points.push((x + 1, y).into()) } // right
         if include_bottom && include_right && include_diagonal { points.push((x + 1, y + 1).into()) } // bottom-right
-        if include_bottom && include_vertical { points.push((x, y + 1).into()) } // bottom
+        if include_bottom { points.push((x, y + 1).into()) } // bottom
         if include_bottom && include_left && include_diagonal { points.push((x - 1, y + 1).into()) } // bottom-left
-        if include_left && include_horizontal { points.push((x - 1, y).into()) } // left
+        if include_left { points.push((x - 1, y).into()) } // left
         if include_left && include_top && include_diagonal { points.push((x - 1, y - 1).into()) } // top-left
 
         points
+    }
+
+    pub fn get_in_direction(&self, p: &Point, direction: Directions) -> Vec<T> {
+        self.get_points_in_direction(p, direction).iter().filter_map(|p| self.get(p)).collect()
+    }
+
+    pub fn get_points_in_direction(&self, p: &Point, direction: Directions) -> Vec<Point> {
+        match direction {
+            Directions::Top | Directions::Right | Directions::Bottom | Directions::Left => {
+                let mut points = vec![];
+                let mut current = p.clone();
+                loop {
+                    let next = self.get_adjacent_points(&current, direction.clone());
+                    if next.len() != 1 {
+                        break;
+                    }
+                    current = next[0];
+                    points.push(current);
+                }
+                points
+            },
+            _ => vec![]
+        }
     }
 
     pub fn points(&self) -> Vec<Point> {
@@ -617,6 +642,14 @@ mod grid_tests {
                    vec![(5, 2).into(), (6, 3).into(), (5, 4).into(), (4, 3).into()]);
         assert_eq!(grid.get_adjacent_points(&(5, 3).into(), Directions::All),
                    vec![(5, 2).into(), (6, 2).into(), (6, 3).into(), (6, 4).into(), (5, 4).into(), (4, 4).into(), (4, 3).into(), (4, 2).into()]);
+    }
+
+    #[test]
+    fn test_get_points_in_direction() {
+        let grid = get_example_grid();
+        assert_eq!(grid.get_points_in_direction(&(0,0).into(), Directions::Left), vec![]);
+        assert_eq!(grid.get_points_in_direction(&(1,0).into(), Directions::Left), vec![(0, 0).into()]);
+        assert_eq!(grid.get_points_in_direction(&(2,0).into(), Directions::Left), vec![(1,0).into(), (0, 0).into()]);
     }
 
     #[test]
