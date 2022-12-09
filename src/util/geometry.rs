@@ -3,9 +3,9 @@
 
 use std::cmp::{max, Ordering};
 use std::collections::HashMap;
-use std::fmt;
+use std::{cmp, fmt};
 use std::hash::Hash;
-use std::ops::{Range};
+use std::ops::{RangeInclusive};
 use std::str::FromStr;
 use crate::util::number;
 
@@ -13,6 +13,22 @@ use crate::util::number;
 pub struct Point {
     pub x: isize,
     pub y: isize,
+}
+
+impl Point {
+    pub fn get_points_around(&self, directions: Directions) -> Vec<Point> {
+        let mut points = vec![];
+        if directions.has(Directions::TopLeft) { points.push((self.x - 1, self.y - 1).into()) }
+        if directions.has(Directions::Top) { points.push((self.x, self.y - 1).into()) }
+        if directions.has(Directions::TopRight) { points.push((self.x + 1, self.y - 1).into()) }
+        if directions.has(Directions::Right) { points.push((self.x + 1, self.y).into()) }
+        if directions.has(Directions::BottomRight) { points.push((self.x + 1, self.y + 1).into()) }
+        if directions.has(Directions::Bottom) { points.push((self.x, self.y + 1).into()) }
+        if directions.has(Directions::BottomLeft) { points.push((self.x - 1, self.y + 1).into()) }
+        if directions.has(Directions::Left) { points.push((self.x - 1, self.y).into()) }
+
+        return points;
+    }
 }
 
 impl fmt::Display for Point {
@@ -68,7 +84,7 @@ impl PartialOrd for Point {
 
 #[cfg(test)]
 mod point_tests {
-    use crate::util::geometry::Point;
+    use crate::util::geometry::{Directions, Point};
 
     #[test]
     fn test_from_str() {
@@ -105,6 +121,12 @@ mod point_tests {
             Point { x: 5, y: 3 },
             Point { x: 2, y: 5},
         ]);
+    }
+
+    #[test]
+    fn test_get_points_around() {
+        assert_eq!(Point::from((3, 2)).get_points_around(Directions::NonDiagonal), vec![(3,1).into(), (4,2).into(), (3,3).into(), (2,2).into()]);
+        assert_eq!(Point::from((3, 2)).get_points_around(Directions::Diagonal), vec![(2,1).into(), (4,1).into(), (4,3).into(), (2,3).into()]);
     }
 }
 
@@ -345,20 +367,20 @@ impl Bounds {
         self.height = (self.height as isize + 2 * by) as usize
     }
 
-    pub fn y(&self) -> Range<isize> {
-        self.top..self.bottom()
+    pub fn y(&self) -> RangeInclusive<isize> {
+        self.top..=self.bottom()
     }
 
-    pub fn x(&self) -> Range<isize> {
-        self.left..self.right()
+    pub fn x(&self) -> RangeInclusive<isize> {
+        self.left..=self.right()
     }
 
     pub fn right(&self) -> isize {
-        self.left + self.width as isize
+        self.left + self.width as isize - 1
     }
 
     pub fn bottom(&self) -> isize {
-        self.top + self.height as isize
+        self.top + self.height as isize - 1
     }
 
     pub fn contains(&self, pixel: &Point) -> bool {
@@ -379,7 +401,11 @@ pub enum Directions {
     Right = 2,
     Bottom = 4,
     Left = 8,
-    Diagonal = 16,
+    TopLeft = 16,
+    TopRight = 32,
+    BottomLeft = 64,
+    BottomRight = 128,
+    Diagonal = Directions::TopLeft as u8 | Directions::TopRight as u8 | Directions::BottomLeft as u8 | Directions::BottomRight as u8,
     Horizontal = Directions::Left as u8 | Directions::Right as u8,
     Vertical = Directions::Top as u8 | Directions::Bottom as u8,
     NonDiagonal = Directions::Horizontal as u8 | Directions::Vertical as u8,
@@ -397,8 +423,8 @@ impl<T> Grid<T> where T: Clone + Default {
     pub fn new(cells: HashMap<Point, T>) -> Self {
         let points: Vec<_> = cells.keys().collect();
         let top = points.iter().map(|p| p.y).min().unwrap_or(0);
-        let bottom = points.iter().map(|p| p.y).max().unwrap_or(0);
         let left = points.iter().map(|p| p.x).min().unwrap_or(0);
+        let bottom = points.iter().map(|p| p.y).max().unwrap_or(0);
         let right = points.iter().map(|p| p.x).max().unwrap_or(0);
 
         let bounds = Bounds::from_tlbr(top, left, bottom, right);
@@ -415,6 +441,16 @@ impl<T> Grid<T> where T: Clone + Default {
 
     pub fn set(&mut self, p: Point, v: T) {
         self.cells.insert(p, v);
+
+        if self.bounds.contains(&p) {
+            return;
+        }
+
+        let top = cmp::min(self.bounds.top, p.y);
+        let left = cmp::min(self.bounds.left, p.x);
+        let bottom = cmp::max(self.bounds.bottom(), p.y);
+        let right = cmp::max(self.bounds.right(), p.x);
+        self.bounds = Bounds::from_tlbr(top, left, bottom, right);
     }
     
     pub fn get_adjacent(&self, p: &Point, directions: Directions) -> Vec<T> {
@@ -422,28 +458,7 @@ impl<T> Grid<T> where T: Clone + Default {
     }
 
     pub fn get_adjacent_points(&self, p: &Point, directions: Directions) -> Vec<Point> {
-        let mut points = vec![];
-
-        let x = p.x;
-        let y = p.y;
-
-        let include_diagonal = directions.has(Directions::Diagonal);
-
-        let include_top = y > self.bounds.top && directions.has(Directions::Top);
-        let include_bottom = y < self.bounds.bottom() - 1 && directions.has(Directions::Bottom);
-        let include_left = x > self.bounds.left && directions.has(Directions::Left);
-        let include_right = x < self.bounds.right() - 1 && directions.has(Directions::Right);
-
-        if include_top { points.push((x, y - 1).into()) } // top
-        if include_top && include_right && include_diagonal { points.push((x + 1, y - 1).into()) } // top-right
-        if include_right { points.push((x + 1, y).into()) } // right
-        if include_bottom && include_right && include_diagonal { points.push((x + 1, y + 1).into()) } // bottom-right
-        if include_bottom { points.push((x, y + 1).into()) } // bottom
-        if include_bottom && include_left && include_diagonal { points.push((x - 1, y + 1).into()) } // bottom-left
-        if include_left { points.push((x - 1, y).into()) } // left
-        if include_left && include_top && include_diagonal { points.push((x - 1, y - 1).into()) } // top-left
-
-        points
+        p.get_points_around(directions).into_iter().filter(|p| self.bounds.contains(p)).collect()
     }
 
     pub fn get_in_direction(&self, p: &Point, direction: Directions) -> Vec<T> {
@@ -572,7 +587,7 @@ impl<T> TryFrom<Vec<Vec<T>>> for Grid<T> where T: Clone + Default {
 
 #[cfg(test)]
 mod grid_tests {
-    use crate::util::geometry::{Grid, Directions};
+    use crate::util::geometry::{Grid, Directions, Bounds};
 
     const EXAMPLE_GRID_INPUT: &str = "\
         2199943210\n\
@@ -641,7 +656,7 @@ mod grid_tests {
         assert_eq!(grid.get_adjacent_points(&(5, 3).into(), Directions::NonDiagonal),
                    vec![(5, 2).into(), (6, 3).into(), (5, 4).into(), (4, 3).into()]);
         assert_eq!(grid.get_adjacent_points(&(5, 3).into(), Directions::All),
-                   vec![(5, 2).into(), (6, 2).into(), (6, 3).into(), (6, 4).into(), (5, 4).into(), (4, 4).into(), (4, 3).into(), (4, 2).into()]);
+                   vec![(4, 2).into(), (5, 2).into(), (6, 2).into(), (6, 3).into(), (6, 4).into(), (5, 4).into(), (4, 4).into(), (4, 3).into()]);
     }
 
     #[test]
@@ -656,5 +671,35 @@ mod grid_tests {
     fn test_values() {
         let grid: Grid<usize> = vec![vec![1, 2, 3], vec![9, 8, 7], vec![5, 6, 4]].try_into().unwrap();
         assert_eq!(grid.values(), vec![1, 2, 3, 9, 8, 7, 5, 6, 4]);
+    }
+
+    #[test]
+    fn test_growing_grid() {
+        let mut grid: Grid<usize> = Grid::default();
+        assert_eq!(grid.bounds, Bounds { top: 0, left: 0, width: 0, height: 0 });
+        assert_eq!(grid.points(), vec![]);
+
+        grid.set((2, 3).into(), 42);
+        assert_eq!(grid.bounds, Bounds { top: 0, left: 0, width: 3, height: 4 });
+        assert_eq!(grid.points(), vec![
+            (0,0).into(), (1,0).into(), (2,0).into(),
+            (0,1).into(), (1,1).into(), (2,1).into(),
+            (0,2).into(), (1,2).into(), (2,2).into(),
+            (0,3).into(), (1,3).into(), (2,3).into()
+        ]);
+
+        grid.set((1,2).into(), 22);
+        assert_eq!(grid.bounds, Bounds { top: 0, left: 0, width: 3, height: 4 });
+
+        grid.set((-2, -2).into(), 12);
+        assert_eq!(grid.bounds, Bounds { top: -2, left: -2, width: 5, height: 6 });
+        assert_eq!(grid.points(), vec![
+            (-2,-2).into(), (-1,-2).into(), (0,-2).into(), (1,-2).into(), (2,-2).into(),
+            (-2,-1).into(), (-1,-1).into(), (0,-1).into(), (1,-1).into(), (2,-1).into(),
+            (-2,0).into(), (-1,0).into(), (0,0).into(), (1,0).into(), (2,0).into(),
+            (-2,1).into(), (-1,1).into(), (0,1).into(), (1,1).into(), (2,1).into(),
+            (-2,2).into(), (-1,2).into(), (0,2).into(), (1,2).into(), (2,2).into(),
+            (-2,3).into(), (-1,3).into(), (0,3).into(), (1,3).into(), (2,3).into()
+        ]);
     }
 }
