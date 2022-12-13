@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use num_traits::Num;
+
 macro_rules! parse_int_impl {
     ($($t:ty, $name: ident)*) => {$(
         #[allow(unused)]
