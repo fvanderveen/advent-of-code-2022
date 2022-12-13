@@ -526,7 +526,7 @@ impl<T> fmt::Display for Grid<T> where T: fmt::Display + Clone + Default {
             lines.push(line);
         }
 
-        let cell_width = lines.iter().map(|line| line.iter().map(|v| v.len()).max().unwrap_or(0)).max().unwrap_or(0);
+        let cell_width = lines.iter().map(|line| line.iter().map(|v| v.len()).max().unwrap_or(0)).max().unwrap_or(0) + 1;
 
         let fill = f.fill().to_string();
         let formatted_lines: Vec<_> = lines.iter().map(|line| {
