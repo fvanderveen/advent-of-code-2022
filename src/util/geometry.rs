@@ -5,7 +5,7 @@ use std::cmp::{max, Ordering};
 use std::collections::HashMap;
 use std::{cmp, fmt};
 use std::hash::Hash;
-use std::ops::{RangeInclusive};
+use std::ops::{Add, RangeInclusive};
 use std::str::FromStr;
 use crate::util::number;
 
@@ -79,6 +79,14 @@ impl Ord for Point {
 impl PartialOrd for Point {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl Add<(isize, isize)> for Point {
+    type Output = Point;
+
+    fn add(self, rhs: (isize, isize)) -> Self::Output {
+        Point { x: self.x + rhs.0, y: self.y + rhs.1 }
     }
 }
 
@@ -446,11 +454,16 @@ impl<T> Grid<T> where T: Clone + Default {
             return;
         }
 
-        let top = cmp::min(self.bounds.top, p.y);
-        let left = cmp::min(self.bounds.left, p.x);
-        let bottom = cmp::max(self.bounds.bottom(), p.y);
-        let right = cmp::max(self.bounds.right(), p.x);
-        self.bounds = Bounds::from_tlbr(top, left, bottom, right);
+        // If this is the first insertion, make the bounds set to that point; otherwise expand:
+        if self.cells.len() == 1 {
+            self.bounds = Bounds::from_tlbr(p.y, p.x, p.y, p.x);
+        } else {
+            let top = cmp::min(self.bounds.top, p.y);
+            let left = cmp::min(self.bounds.left, p.x);
+            let bottom = cmp::max(self.bounds.bottom(), p.y);
+            let right = cmp::max(self.bounds.right(), p.x);
+            self.bounds = Bounds::from_tlbr(top, left, bottom, right);
+        }
     }
     
     pub fn get_adjacent(&self, p: &Point, directions: Directions) -> Vec<T> {
@@ -521,12 +534,12 @@ impl<T> fmt::Display for Grid<T> where T: fmt::Display + Clone + Default {
         for y in self.bounds.y() {
             let mut line = vec![];
             for x in self.bounds.x() {
-                line.push(self.cells.get(&(x, y).into()).map(|v| format!("{}", v)).unwrap_or(String::new()))
+                line.push(format!("{}", self.cells.get(&(x, y).into()).cloned().unwrap_or_default()))
             }
             lines.push(line);
         }
 
-        let cell_width = lines.iter().map(|line| line.iter().map(|v| v.len()).max().unwrap_or(0)).max().unwrap_or(0) + 1;
+        let cell_width = lines.iter().map(|line| line.iter().map(|v| v.len()).max().unwrap_or(0)).max().unwrap_or(0);
 
         let fill = f.fill().to_string();
         let formatted_lines: Vec<_> = lines.iter().map(|line| {
@@ -680,16 +693,17 @@ mod grid_tests {
         assert_eq!(grid.points(), vec![]);
 
         grid.set((2, 3).into(), 42);
-        assert_eq!(grid.bounds, Bounds { top: 0, left: 0, width: 3, height: 4 });
+        assert_eq!(grid.bounds, Bounds { top: 3, left: 2, width: 1, height: 1 });
         assert_eq!(grid.points(), vec![
-            (0,0).into(), (1,0).into(), (2,0).into(),
-            (0,1).into(), (1,1).into(), (2,1).into(),
-            (0,2).into(), (1,2).into(), (2,2).into(),
-            (0,3).into(), (1,3).into(), (2,3).into()
+            (2,3).into()
         ]);
 
         grid.set((1,2).into(), 22);
-        assert_eq!(grid.bounds, Bounds { top: 0, left: 0, width: 3, height: 4 });
+        assert_eq!(grid.bounds, Bounds { top: 2, left: 1, width: 2, height: 2 });
+        assert_eq!(grid.points(), vec![
+            (1,2).into(), (2,2).into(),
+            (1,3).into(), (2,3).into()
+        ]);
 
         grid.set((-2, -2).into(), 12);
         assert_eq!(grid.bounds, Bounds { top: -2, left: -2, width: 5, height: 6 });
