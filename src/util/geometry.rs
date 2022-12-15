@@ -7,6 +7,7 @@ use std::{cmp, fmt};
 use std::hash::Hash;
 use std::ops::{Add, RangeInclusive};
 use std::str::FromStr;
+use num_traits::abs;
 use crate::util::number;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, Default)]
@@ -28,6 +29,10 @@ impl Point {
         if directions.has(Directions::Left) { points.push((self.x - 1, self.y).into()) }
 
         return points;
+    }
+
+    pub fn manhattan_distance(&self, other: &Point) -> isize {
+        abs(self.x - other.x) + abs(self.y - other.y)
     }
 }
 
@@ -135,6 +140,14 @@ mod point_tests {
     fn test_get_points_around() {
         assert_eq!(Point::from((3, 2)).get_points_around(Directions::NonDiagonal), vec![(3,1).into(), (4,2).into(), (3,3).into(), (2,2).into()]);
         assert_eq!(Point::from((3, 2)).get_points_around(Directions::Diagonal), vec![(2,1).into(), (4,1).into(), (4,3).into(), (2,3).into()]);
+    }
+
+    #[test]
+    fn test_manhattan_distance() {
+        let point_a = Point { x: 1, y: 2 };
+        let point_b = Point { x: 13, y: 4 };
+        assert_eq!(point_a.manhattan_distance(&point_b), 14);
+        assert_eq!(point_b.manhattan_distance(&point_a), 14);
     }
 }
 
