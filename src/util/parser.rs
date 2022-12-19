@@ -6,8 +6,9 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(input: String) -> Self {
-        Parser { input, position: 0 }
+    pub fn new<T>(input: T) -> Self
+        where T: ToString {
+        Parser { input: input.to_string(), position: 0 }
     }
 
     fn skip_whitespace(&mut self) {
@@ -57,5 +58,21 @@ impl Parser {
         };
 
         Ok(modifier * (self.usize()?) as isize)
+    }
+
+    pub fn str(&mut self, len: usize) -> Result<String, String> {
+        self.skip_whitespace();
+
+        let result: Vec<_> = self.input.chars().skip(self.position).take(len).collect();
+        if result.len() != len {
+            Err(format!("Expected to read {} chars, but only got {}. ('{}':{})", len, result.len(), self.input, self.position))
+        } else {
+            self.position += len;
+            Ok(result.iter().collect())
+        }
+    }
+
+    pub fn is_exhausted(&self) -> bool {
+        self.position >= self.input.len()
     }
 }
