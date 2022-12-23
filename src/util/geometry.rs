@@ -248,6 +248,21 @@ impl Point3D {
             z: self.z + other.z,
         }
     }
+
+    pub fn get_points_around(&self) -> Vec<Point3D> {
+        let mut points = vec![];
+
+        for z in -1..=1 {
+            for y in -1..=1 {
+                for x in -1..=1 {
+                    if x == 0 && y == 0 && z == 0 { continue; }
+                    points.push((self.x + x,self.y + y, self.z + z).into());
+                }
+            }
+        }
+
+        points
+    }
 }
 
 #[cfg(test)]
