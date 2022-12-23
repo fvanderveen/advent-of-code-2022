@@ -87,11 +87,32 @@ impl PartialOrd for Point {
     }
 }
 
+impl Add<&Point> for Point {
+    type Output = Point;
+
+    fn add(self, rhs: &Point) -> Self::Output {
+        Point { x: self.x + rhs.x, y: self.y + rhs.y }
+    }
+}
+impl Add<Point> for Point {
+    type Output = Point;
+
+    fn add(self, rhs: Point) -> Self::Output {
+        self + &rhs
+    }
+}
 impl Add<(isize, isize)> for Point {
     type Output = Point;
 
     fn add(self, rhs: (isize, isize)) -> Self::Output {
-        Point { x: self.x + rhs.0, y: self.y + rhs.1 }
+        self + Point::from(rhs)
+    }
+}
+impl Add<Point> for Vec<Point> {
+    type Output = Vec<Point>;
+
+    fn add(self, rhs: Point) -> Self::Output {
+        self.iter().map(|p| rhs + p).collect()
     }
 }
 
