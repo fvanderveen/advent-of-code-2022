@@ -1,3 +1,4 @@
+use std::cmp::min;
 use crate::util::number::parse_usize;
 
 pub struct Parser {
@@ -18,13 +19,23 @@ impl Parser {
     pub fn literal(&mut self, literal: &str) -> Result<(), String> {
         self.skip_whitespace();
 
-        let actual = &self.input[self.position..self.position+literal.len()];
+        let actual = &self.input[self.position..min(self.position+literal.len(), self.input.len())];
         if actual != literal {
             Err(format!("Expected '{}' to match '{}' ('{}':{})", actual, literal, self.input, self.position))
         } else {
             self.position += literal.len();
             Ok(())
         }
+    }
+
+    pub fn one_of(&mut self, options: Vec<&'static str>) -> Result<&'static str, String> {
+        for option in &options {
+            if self.literal(option).is_ok() {
+                return Ok(option)
+            }
+        }
+
+        Err(format!("Expected one of {} ('{}':{})", options.iter().map(|o| format!("'{}'",o)).collect::<Vec<_>>().join(", "), self.input, self.position))
     }
 
     pub fn usize(&mut self) -> Result<usize, String> {
@@ -73,6 +84,7 @@ impl Parser {
     }
 
     pub fn is_exhausted(&self) -> bool {
-        self.position >= self.input.len()
+        let rest = &self.input[self.position..self.input.len()];
+        rest.is_empty() || rest.chars().all(|c| c.is_whitespace())
     }
 }
