@@ -443,6 +443,18 @@ impl Bounds {
     pub fn contains(&self, pixel: &Point) -> bool {
         self.x().contains(&pixel.x) && self.y().contains(&pixel.y)
     }
+    
+    pub fn points(&self) -> Vec<Point> {
+        let mut points = vec![];
+        
+        for y in self.y() {
+            for x in self.x() {
+                points.push((x, y).into());
+            }
+        }
+        
+        points
+    }
 }
 
 #[derive(Eq, PartialEq, Clone)]
@@ -471,6 +483,10 @@ pub enum Directions {
     TopRight = 32,
     BottomLeft = 64,
     BottomRight = 128,
+    TopAll = Directions::TopLeft as u8 | Directions::Top as u8 | Directions::TopRight as u8,
+    BottomAll = Directions::BottomLeft as u8 | Directions::Bottom as u8 | Directions::BottomRight as u8,
+    LeftAll = Directions::TopLeft as u8 | Directions::Left as u8 | Directions::BottomLeft as u8,
+    RightAll = Directions::TopRight as u8 | Directions::Right as u8 | Directions::BottomRight as u8,
     Diagonal = Directions::TopLeft as u8 | Directions::TopRight as u8 | Directions::BottomLeft as u8 | Directions::BottomRight as u8,
     Horizontal = Directions::Left as u8 | Directions::Right as u8,
     Vertical = Directions::Top as u8 | Directions::Bottom as u8,
@@ -478,7 +494,7 @@ pub enum Directions {
     All = Directions::NonDiagonal as u8 | Directions::Diagonal as u8,
 }
 
-impl Directions {
+impl Directions {    
     pub fn has(&self, value: Directions) -> bool {
         (self.clone() as u8 & value as u8) != 0
     }
