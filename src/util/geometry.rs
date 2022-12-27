@@ -445,14 +445,23 @@ impl Bounds {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Default)]
-pub struct Grid<T> where T: Clone + Default {
+#[derive(Eq, PartialEq, Clone)]
+pub struct Grid<T> where T: Clone {
     pub bounds: Bounds,
     cells: HashMap<Point, T>,
 }
 
+impl<T> Default for Grid<T> where T: Clone + Default {
+    fn default() -> Self {
+        Grid {
+            bounds: Bounds::default(),
+            cells: HashMap::default()
+        }
+    }
+}
+
 #[repr(u8)]
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum Directions {
     Top = 1,
     Right = 2,
@@ -476,7 +485,7 @@ impl Directions {
 }
 
 #[allow(unused)]
-impl<T> Grid<T> where T: Clone + Default {
+impl<T> Grid<T> where T: Clone {
     pub fn new(cells: HashMap<Point, T>) -> Self {
         let points: Vec<_> = cells.keys().collect();
         let top = points.iter().map(|p| p.y).min().unwrap_or(0);
@@ -487,9 +496,17 @@ impl<T> Grid<T> where T: Clone + Default {
         let bounds = Bounds::from_tlbr(top, left, bottom, right);
         Self { bounds, cells }
     }
+    
+    pub fn empty() -> Self {
+        Self { bounds: Bounds::default(), cells: HashMap::new() }
+    }
 
     pub fn get(&self, p: &Point) -> Option<T> {
         self.cells.get(p).map(|x| x.clone())
+    }
+    
+    pub fn has(&self, p: &Point) -> bool {
+        self.cells.contains_key(p)
     }
 
     pub fn get_mut(&mut self, p: &Point) -> Option<&mut T> {
@@ -559,7 +576,7 @@ impl<T> Grid<T> where T: Clone + Default {
     }
 
     pub fn values(&self) -> Vec<T> {
-        self.points().iter().map(|p| self.get(p).unwrap_or_default()).collect()
+        self.points().iter().filter_map(|p| self.get(p)).collect()
     }
     
     pub fn entries(&self) -> Vec<(Point, T)> {
@@ -567,7 +584,7 @@ impl<T> Grid<T> where T: Clone + Default {
     }
 }
 
-impl<T> fmt::Debug for Grid<T> where T: fmt::Display + Clone + Default {
+impl<T> fmt::Debug for Grid<T> where T: fmt::Display + Clone {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Grid")
             .field("bounds", &self.bounds)
@@ -576,14 +593,18 @@ impl<T> fmt::Debug for Grid<T> where T: fmt::Display + Clone + Default {
     }
 }
 
-impl<T> fmt::Display for Grid<T> where T: fmt::Display + Clone + Default {
+impl<T> fmt::Display for Grid<T> where T: fmt::Display + Clone {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut lines = vec![];
 
         for y in self.bounds.y() {
             let mut line = vec![];
             for x in self.bounds.x() {
-                line.push(format!("{}", self.cells.get(&(x, y).into()).cloned().unwrap_or_default()))
+                if let Some(val) = self.cells.get(&(x, y).into()) {
+                    line.push(format!("{}", val))
+                } else {
+                    line.push(" ".to_string())
+                }
             }
             lines.push(line);
         }
