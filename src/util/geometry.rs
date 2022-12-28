@@ -417,6 +417,10 @@ impl Bounds {
         }
     }
 
+    pub fn from_size(width: usize, height: usize) -> Self {
+        Self { top: 0, left: 0, width, height }
+    }
+    
     pub fn grow(&mut self, by: isize) {
         self.top -= by;
         self.left -= by;
